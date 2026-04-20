@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import matplotlib.pyplot as plt
+import plotly.express as px
 import webbrowser
 
 # -------------------------------
@@ -11,22 +11,41 @@ import webbrowser
 st.set_page_config(page_title="Smart Job System", layout="wide")
 
 # -------------------------------
-# LOGIN SYSTEM
+# CUSTOM CSS (DARK UI)
+# -------------------------------
+st.markdown("""
+<style>
+body {background-color: #0e1117; color: white;}
+[data-testid="stSidebar"] {background-color: #111;}
+.card {
+    background-color: #1c1f26;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 10px 0;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.6);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------
+# LOGIN SYSTEM (UI)
 # -------------------------------
 if "login" not in st.session_state:
-    st.session_state["login"] = False
+    st.session_state.login = False
 
 def login():
-    st.title("🔐 Login Page")
+    st.markdown("<h2 style='text-align:center;'>🔐 Login</h2>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username == "admin" and password == "1234":
-            st.session_state["login"] = True
-        else:
-            st.error("Invalid credentials")
+        if st.button("Login"):
+            if username == "admin" and password == "1234":
+                st.session_state.login = True
+            else:
+                st.error("Invalid credentials")
 
 # -------------------------------
 # SCRAPER
@@ -37,7 +56,6 @@ def scrape_jobs():
     soup = BeautifulSoup(response.text, 'html.parser')
 
     jobs = []
-
     for card in soup.find_all('div', class_='card-content'):
         title = card.find('h2').text.strip()
         company = card.find('h3').text.strip()
@@ -54,112 +72,107 @@ def scrape_jobs():
 # -------------------------------
 # MAIN APP
 # -------------------------------
-if not st.session_state["login"]:
+if not st.session_state.login:
     login()
 
 else:
     df = scrape_jobs()
 
-    st.title("💼 Smart Job Management System")
-
     # -------------------------------
-    # SIDEBAR UI
+    # SIDEBAR NAVIGATION
     # -------------------------------
-    st.sidebar.title("💼 Menu")
+    st.sidebar.title("💼 Navigation")
 
-    st.sidebar.markdown("### 🔎 Job Portals")
-    st.sidebar.markdown("1. Indeed  \n2. Naukri  \n3. Glassdoor  \n4. Shine")
-
-    st.sidebar.markdown("### 🔍 Job Search")
-    st.sidebar.markdown("5. Search Jobs (Google)")
-
-    st.sidebar.markdown("### 📊 Analysis")
-    st.sidebar.markdown("6. Show Jobs  \n7. Search Job (Local Data)  \n8. Location Analysis  \n9. Skill Analysis")
-
-    st.sidebar.markdown("### 🎓 Learning Platforms")
-    st.sidebar.markdown("10. Coursera  \n11. Udemy  \n12. LinkedIn Learning")
-
-    st.sidebar.markdown("### 📄 Career Tools")
-    st.sidebar.markdown("13. Resume Builder  \n14. LinkedIn Profile")
-
-    st.sidebar.markdown("### 🚪 Exit")
-    st.sidebar.markdown("15. Exit")
-
-    # -------------------------------
-    # INTERACTIVE MENU
-    # -------------------------------
-    menu = st.sidebar.radio("Select Option", [
-        "Indeed",
-        "Naukri",
-        "Glassdoor",
-        "Shine",
-        "Search Jobs",
-        "Show Jobs",
-        "Search (Local)",
-        "Location Analysis",
-        "Skill Analysis",
-        "Coursera",
-        "Udemy",
-        "LinkedIn Learning",
-        "Resume Builder",
-        "LinkedIn Profile",
-        "Exit"
+    page = st.sidebar.radio("Go to", [
+        "Dashboard",
+        "Jobs",
+        "Analysis",
+        "Skills",
+        "Quick Links"
     ])
 
     # -------------------------------
-    # FUNCTIONALITY
+    # DASHBOARD
     # -------------------------------
-    if menu == "Indeed":
-        webbrowser.open("https://in.indeed.com")
+    if page == "Dashboard":
+        st.title("🚀 Smart Job Dashboard")
 
-    elif menu == "Naukri":
-        webbrowser.open("https://www.naukri.com")
+        col1, col2, col3 = st.columns(3)
 
-    elif menu == "Glassdoor":
-        webbrowser.open("https://www.glassdoor.co.in")
+        col1.markdown(f"<div class='card'>📊 Total Jobs<br><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div class='card'>🏢 Companies<br><h2>{df['company'].nunique()}</h2></div>", unsafe_allow_html=True)
+        col3.markdown(f"<div class='card'>📍 Locations<br><h2>{df['location'].nunique()}</h2></div>", unsafe_allow_html=True)
 
-    elif menu == "Shine":
-        webbrowser.open("https://www.shine.com")
+        st.subheader("📍 Top Locations")
+        fig = px.bar(df['location'].value_counts().head(10),
+                     title="Top Job Locations",
+                     color=df['location'].value_counts().head(10).values,
+                     color_continuous_scale="Blues")
+        st.plotly_chart(fig, use_container_width=True)
 
-    elif menu == "Search Jobs":
-        keyword = st.text_input("Enter job keyword")
-        if keyword:
-            webbrowser.open(f"https://www.google.com/search?q={keyword}+jobs")
+    # -------------------------------
+    # JOB PAGE
+    # -------------------------------
+    elif page == "Jobs":
+        st.title("📋 Job Listings")
 
-    elif menu == "Show Jobs":
-        st.subheader("📋 Job Listings")
-        st.dataframe(df)
+        keyword = st.text_input("🔍 Search job")
 
-    elif menu == "Search (Local)":
-        keyword = st.text_input("Search jobs")
         if keyword:
             filtered = df[df['title'].str.contains(keyword, case=False)]
+            st.success(f"{len(filtered)} jobs found")
             st.dataframe(filtered)
+        else:
+            st.dataframe(df)
 
-    elif menu == "Location Analysis":
-        st.subheader("📍 Location Analysis")
-        st.bar_chart(df['location'].value_counts())
+    # -------------------------------
+    # ANALYSIS PAGE
+    # -------------------------------
+    elif page == "Analysis":
+        st.title("📊 Analysis")
 
-    elif menu == "Skill Analysis":
-        st.subheader("🧠 Skill Demand")
+        loc_data = df['location'].value_counts().head(10)
+
+        fig = px.bar(loc_data,
+                     title="Location Analysis",
+                     color=loc_data.values,
+                     color_continuous_scale="Teal")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    # -------------------------------
+    # SKILLS PAGE
+    # -------------------------------
+    elif page == "Skills":
+        st.title("🧠 Skill Demand")
+
         skills = ["Python", "Java", "SQL", "Data", "AI"]
         skill_count = {skill: df['title'].str.contains(skill, case=False).sum() for skill in skills}
-        st.bar_chart(skill_count)
 
-    elif menu == "Coursera":
-        webbrowser.open("https://www.coursera.org")
+        fig = px.bar(
+            x=list(skill_count.keys()),
+            y=list(skill_count.values()),
+            title="Skill Demand",
+            color=list(skill_count.values()),
+            color_continuous_scale="Viridis"
+        )
 
-    elif menu == "Udemy":
-        webbrowser.open("https://www.udemy.com")
+        st.plotly_chart(fig, use_container_width=True)
 
-    elif menu == "LinkedIn Learning":
-        webbrowser.open("https://www.linkedin.com/learning")
+    # -------------------------------
+    # LINKS PAGE
+    # -------------------------------
+    elif page == "Quick Links":
+        st.title("🌐 Job & Career Links")
 
-    elif menu == "Resume Builder":
-        webbrowser.open("https://www.canva.com/resumes/")
+        if st.button("Open Indeed"):
+            webbrowser.open("https://in.indeed.com")
 
-    elif menu == "LinkedIn Profile":
-        webbrowser.open("https://www.linkedin.com")
+        if st.button("Open Naukri"):
+            webbrowser.open("https://www.naukri.com")
 
-    elif menu == "Exit":
-        st.warning("👋 Exit selected")
+        if st.button("Open Coursera"):
+            webbrowser.open("https://www.coursera.org")
+
+        if st.button("Resume Builder"):
+            webbrowser.open("https://www.canva.com/resumes/")
